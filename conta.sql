@@ -1,72 +1,92 @@
--Criação das funções
+CREATE TABLE conta(
+agencia int,
+numero int,
+cli varchar(100),
+saldo numeric(12, 2),
+ativa boolean
+);
 
-CREATE OR REPLACE FUNCTION abrirConta(cliente_ varchar, agencia_ int, numero_ int, valor_ numeric)
+create table contaAuditoria(
+    opera varchar(100),
+    usuario varchar(100),
+ 	tempo timestamp,
+	agencia int,
+  numero int,
+  cli varchar(100),
+  saldo numeric(12, 2),
+  ativa boolean
+);
+
+
+
+CREATE OR REPLACE FUNCTION abrirConta(cli_ varchar, agen int, numer int, valor numeric)
 RETURNS void as $$
 BEGIN
-	INSERT INTO conta VALUES (agencia_,numero_,cliente_,valor_,'true');
+	INSERT INTO conta VALUES (agen,numer,cli_,valor,'true');
 END;
 $$ LANGUAGE PLPGSQL;
 
-SELECT abrirConta('Alysson',332,12345,300.50);
-SELECT abrirConta('Camilly',342,54321,400.00);
-SELECT abrirConta('José',332,98102,350.00);
 
-
-CREATE OR REPLACE FUNCTION exibirSaldo(agencia_ int, numero_ int)
+CREATE OR REPLACE FUNCTION exibirSaldo(agen int, numer int)
 RETURNS numeric(12,2) AS $$
 DECLARE
 	saldoConta numeric(12,2);
 BEGIN
 	 SELECT saldo into saldoConta FROM conta 
-	 WHERE agencia = agencia_ and numero = numero_;
+	 WHERE agencia = agen and numero = numer;
 	 RETURN saldoConta;
 END;
 $$ LANGUAGE PLPGSQL;
 
-SELECT exibirSaldo(332,12345);
-
-
-CREATE OR REPLACE FUNCTION depositar(agencia_ int, numero_ int, valor_ numeric(12,2))
+CREATE OR REPLACE FUNCTION depositar(agen int, numer int, val numeric(12,2))
 RETURNS void AS $$
 BEGIN
-	UPDATE conta SET saldo = saldo + valor_ WHERE agencia = agencia_ and numero = numero_;
+	UPDATE conta SET saldo = saldo + val WHERE agencia = agen and numero = numer;
 END;
 $$ LANGUAGE PLPGSQL;
 
-SELECT depositar(332,12345,10);
-
-
-CREATE OR REPLACE FUNCTION sacar(agencia_ int, numero_ int, valor_ numeric(12,2))
+CREATE OR REPLACE FUNCTION sacar(agen int, numer int, val numeric(12,2))
 RETURNS void AS $$
 BEGIN
-	UPDATE conta SET saldo = saldo - valor_ WHERE agencia = agencia_ and numero = numero_;
+	UPDATE conta SET saldo = saldo - val WHERE agencia = agen and numero = numer;
 END;
 $$ LANGUAGE PLPGSQL;
-
-SELECT sacar(332,12345,0.50);
-
 
 CREATE OR REPLACE FUNCTION 
-transferir(agenciaOrigem int, numeroOrigem int, agenciaDestino int, numeroDestino int,  valor numeric(12,2))
+transferir(agenciaTransferir int, numeroTransferir int, agenciaReceber int, numeroReceber int,  val numeric(12,2))
 RETURNS void AS $$
 BEGIN
-	UPDATE conta SET saldo = saldo - valor WHERE agencia = agenciaOrigem and numero = numeroOrigem;
-	UPDATE conta SET saldo = saldo + valor WHERE agencia = agenciaDestino and numero = numeroDestino;
+	UPDATE conta SET saldo = saldo - val WHERE agencia = agenciaTransferir and numero = numeroTransferir;
+	UPDATE conta SET saldo = saldo + val WHERE agencia = agenciaReceber and numero = numeroReceber;
+END;
+$$ LANGUAGE PLPGSQL;
+
+CREATE OR REPLACE FUNCTION bloquearConta(agen int, numer int)
+RETURNS void AS $$
+BEGIN
+	UPDATE conta SET ativa = false WHERE agencia = agen AND numero = numer; 
+END;
+$$ LANGUAGE PLPGSQL;
+
+CREATE OR REPLACE FUNCTION desbloquearConta(agen int, numer int)
+RETURNS void AS $$
+BEGIN
+	UPDATE conta SET ativa = true WHERE agencia = agen AND numero = numer; 
 END;
 $$ LANGUAGE PLPGSQL;
 
 
-Criação da auditoria(TRIGGER)
+
 
 CREATE OR REPLACE FUNCTION conta_audit()
 RETURNS TRIGGER AS $$
 BEGIN
 	IF (TG_OP = 'DELETE') THEN
-		INSERT INTO contaAuditoria SELECT 'D', user,  now(), OLD.agencia, OLD.numero, OLD.cliente, OLD.saldo, OLD.ativa;
+		INSERT INTO contaAuditoria SELECT 'D', user,  now(), OLD.agencia, OLD.numero, OLD.cli, OLD.saldo, OLD.ativa;
 	ELSIF (TG_OP = 'UPDATE') THEN
-		INSERT INTO contaAuditoria SELECT 'U', user,  now(), NEW.agencia, NEW.numero, NEW.cliente, NEW.saldo, NEW.ativa;
+		INSERT INTO contaAuditoria SELECT 'U', user,  now(), NEW.agencia, NEW.numero, NEW.cli, NEW.saldo, NEW.ativa;
 	ELSIF (TG_OP = 'INSERT') THEN
-		INSERT INTO contaAuditoria SELECT 'I', user,  now(), NEW.agencia, NEW.numero, NEW.cliente, NEW.saldo, NEW.ativa;
+		INSERT INTO contaAuditoria SELECT 'I', user,  now(), NEW.agencia, NEW.numero, NEW.cli, NEW.saldo, NEW.ativa;
 	END IF;
 	RETURN null;
 END;
@@ -76,26 +96,10 @@ CREATE TRIGGER contaAuditoria
 AFTER INSERT OR UPDATE OR DELETE
 ON conta FOR EACH ROW EXECUTE PROCEDURE conta_audit();
 
-SELECT * FROM contaAuditoria;
+SELECT abrirConta('camila',3333,132323,2323.50);
+SELECT abrirConta('ruan',2323,31313,321313.00);
+SELECT abrirConta('zefinha',3455,31313,31313.00);
 
-SELECT transferir(342,54321,332,12345,15);
+select depositar(3333, 132323, 2222.50);
 
-
-CREATE OR REPLACE FUNCTION bloquearConta(agencia_ int, numero_ int)
-RETURNS void AS $$
-BEGIN
-	UPDATE conta SET ativa = false WHERE agencia = agencia_ AND numero = numero_; 
-END;
-$$ LANGUAGE PLPGSQL; 
-
-SELECT bloquearConta(332,12345);
-
-
-CREATE OR REPLACE FUNCTION desbloquearConta(agencia_ int, numero_ int)
-RETURNS void AS $$
-BEGIN
-	UPDATE conta SET ativa = true WHERE agencia = agencia_ AND numero = numero_; 
-END;
-$$ LANGUAGE PLPGSQL; 
-
-SELECT desbloquearConta(332,12345);
+SELECT sacar(3333,132323, 132323);
